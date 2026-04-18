@@ -77,8 +77,6 @@ const Register = () => {
       // Note: User is automatically redirected to dashboard by the useEffect above
       // because 'user' state becomes populated after successful registration
     } catch (error) {
-      // Show error toast with message from server or default message
-      // error.response?.data?.message gets the error message from backend API
       // Common errors: email already exists, validation errors, etc.
       toast.error(error.response?.data?.message || "Registration failed");
     } finally {

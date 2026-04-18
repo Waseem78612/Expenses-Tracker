@@ -10,9 +10,6 @@ import dotenv from 'dotenv';
 // Import JWT for creating and verifying authentication tokens
 import jwt from 'jsonwebtoken';
 
-// Import rate limiting to prevent brute force attacks
-import rateLimit from 'express-rate-limit';
-
 // Import database connection function
 import connectDB from './config/db.js';
 
@@ -33,29 +30,6 @@ connectDB();
 
 // Create Express application
 const app = express();
-
-// ========== RATE LIMITING ==========
-
-// Rate limiter for login endpoint - prevents password brute force attacks
-// Allows only 5 login attempts per 5 minutes from same IP
-const loginLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes in milliseconds
-  max: 5, // Maximum 5 requests per window
-  message: { message: 'Too many login attempts. Please try again after 5 minutes.' },
-  skipSuccessfulRequests: true, // Don't count successful logins toward the limit
-  standardHeaders: true, // Send rate limit info in standard headers
-  legacyHeaders: false, // Don't send deprecated X-RateLimit headers
-});
-
-// Rate limiter for registration endpoint - prevents bot account creation
-// Allows only 3 registration attempts per 5 minutes from same IP
-const registerLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3, // Maximum 3 registration attempts
-  message: { message: 'Too many registration attempts. Please try again after 5 minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 // ========== GLOBAL MIDDLEWARE ==========
 
@@ -242,28 +216,31 @@ app.post('/api/transactions', authMiddleware, async (req, res) => {
 app.put('/api/transactions/:id', authMiddleware, async (req, res) => {
   try {
     const { type, category, amount, description, date } = req.body;
-    const updateData = {};
+    const updateData = {}; // Empty object to collect fields to update
 
-    // Validate MongoDB ObjectId format
+    // Validate MongoDB ObjectId format (24 hex characters)
     if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({ message: 'Invalid transaction ID format' });
     }
 
     // Only update fields that are provided (partial updates)
+    // Check if type was sent in request body
     if (type !== undefined) {
       if (type !== 'income' && type !== 'expense') {
         return res.status(400).json({ message: 'Type must be either "income" or "expense"' });
       }
-      updateData.type = type;
+      updateData.type = type; // Add type to update object
     }
 
+    // Check if category was sent in request body
     if (category !== undefined) {
       if (category.length > 50) {
         return res.status(400).json({ message: 'Category name is too long (max 50 characters)' });
       }
-      updateData.category = category;
+      updateData.category = category; // Add category to update object
     }
 
+    // Check if amount was sent in request body
     if (amount !== undefined) {
       const amountNum = Number(amount);
       if (isNaN(amountNum) || amountNum <= 0) {
@@ -272,28 +249,30 @@ app.put('/api/transactions/:id', authMiddleware, async (req, res) => {
       if (!/^\d+(\.\d{1,2})?$/.test(amountNum.toString())) {
         return res.status(400).json({ message: 'Amount can have at most 2 decimal places' });
       }
-      updateData.amount = amountNum;
+      updateData.amount = amountNum; // Add amount to update object
     }
 
+    // Check if description was sent in request body
     if (description !== undefined) {
       if (description.length > 200) {
         return res.status(400).json({ message: 'Description is too long (max 200 characters)' });
       }
-      updateData.description = description;
+      updateData.description = description; // Add description to update object
     }
 
+    // Check if date was sent in request body
     if (date !== undefined) {
       const validDate = new Date(date);
       if (isNaN(validDate.getTime())) {
         return res.status(400).json({ message: 'Invalid date format' });
       }
-      updateData.date = validDate;
+      updateData.date = validDate; // Add date to update object
     }
 
     // Find and update - only if transaction belongs to this user (security)
     const transaction = await Transaction.findOneAndUpdate(
       { _id: req.params.id, user: req.userId }, // Both conditions must match
-      updateData,
+      updateData, // Only update the fields that were provided
       { new: true, runValidators: true } // Return updated doc, run schema validators
     );
 
@@ -309,7 +288,7 @@ app.put('/api/transactions/:id', authMiddleware, async (req, res) => {
 // DELETE /api/transactions/:id - Delete a transaction
 app.delete('/api/transactions/:id', authMiddleware, async (req, res) => {
   try {
-    // Validate MongoDB ObjectId format
+    // Validate MongoDB ObjectId format (24 hex characters)
     if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({ message: 'Invalid transaction ID format' });
     }
@@ -332,7 +311,7 @@ app.delete('/api/transactions/:id', authMiddleware, async (req, res) => {
 // ========== AUTHENTICATION ROUTES ==========
 
 // POST /api/auth/register - Create new user account
-app.post('/api/auth/register', registerLimiter, async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -349,7 +328,7 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Password is required' });
     }
 
-    // Validate name length
+    // Validate name length (2-50 characters)
     if (name.length < 2) {
       return res.status(400).json({ message: 'Name must be at least 2 characters' });
     }
@@ -363,7 +342,7 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Please provide a valid email address' });
     }
 
-    // Validate password length
+    // Validate password length (6-100 characters)
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
@@ -399,7 +378,7 @@ app.post('/api/auth/register', registerLimiter, async (req, res) => {
 });
 
 // POST /api/auth/login - Authenticate existing user
-app.post('/api/auth/login', loginLimiter, async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -411,13 +390,13 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Password is required' });
     }
 
-    // Find user by email
+    // Find user by email in database
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Compare provided password with stored hash
+    // Compare provided password with stored hash using custom method
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -430,7 +409,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Send token and user info back
+    // Send token and user info back (excluding password)
     res.json({
       token,
       user: { id: user._id, name: user.name, email: user.email, currency: user.currency }
@@ -443,7 +422,7 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 // GET /api/auth/me - Get current logged-in user's profile
 app.get('/api/auth/me', authMiddleware, async (req, res) => {
   try {
-    // Find user by ID from token, exclude password field
+    // Find user by ID from token, exclude password field from response
     const user = await User.findById(req.userId).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -458,9 +437,9 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
 app.put('/api/auth/settings', authMiddleware, async (req, res) => {
   try {
     const { currency, name } = req.body;
-    const updateData = {};
+    const updateData = {}; // Empty object to collect fields to update
 
-    // Validate and update name if provided
+    // Validate and update name if provided in request
     if (name !== undefined) {
       if (name.length < 2) {
         return res.status(400).json({ message: 'Name must be at least 2 characters' });
@@ -468,24 +447,24 @@ app.put('/api/auth/settings', authMiddleware, async (req, res) => {
       if (name.length > 50) {
         return res.status(400).json({ message: 'Name cannot exceed 50 characters' });
       }
-      updateData.name = name;
+      updateData.name = name; // Add name to update object
     }
 
-    // Validate and update currency if provided
+    // Validate and update currency if provided in request
     if (currency !== undefined) {
       const validCurrencies = ['USD', 'EUR', 'GBP', 'PKR', 'INR'];
       if (!validCurrencies.includes(currency)) {
         return res.status(400).json({ message: 'Invalid currency. Supported: USD, EUR, GBP, PKR, INR' });
       }
-      updateData.currency = currency;
+      updateData.currency = currency; // Add currency to update object
     }
 
     // Find and update user, exclude password from response
     const user = await User.findByIdAndUpdate(
       req.userId,
-      updateData,
+      updateData, // Only update the fields that were provided
       { new: true, runValidators: true } // Return updated doc, run validators
-    ).select('-password');
+    ).select('-password'); // Exclude password from response
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -502,7 +481,7 @@ app.put('/api/auth/settings', authMiddleware, async (req, res) => {
 // Get port from environment variable or use 5000 as default
 const PORT = process.env.PORT || 5000;
 
-// Start listening for incoming requests
+// Start listening for incoming requests on specified port
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

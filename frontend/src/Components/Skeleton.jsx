@@ -1,4 +1,3 @@
-// Components/Skeleton.jsx
 const Skeleton = ({ type, count = 1, className = "" }) => {
   const skeletons = {
     // Card skeleton (for stats, transaction items)
