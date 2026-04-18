@@ -1,0 +1,54 @@
+/* Import Tailwind CSS framework - provides utility classes like flex, p-4, bg-blue-500 */
+@import "tailwindcss";
+
+/* Enable dark variant for Tailwind v4 - allows using 'dark:' prefix in class names */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Force dark mode background on all major container elements */
+html,
+body,
+#root,
+div[class*="min-h-screen"] {
+  background-color: #111827 !important;
+}
+
+/* Define CSS custom properties (variables) for dark mode colors - used throughout the app */
+:root {
+  --bg-primary: #111827; /* Primary background color (dark gray) */
+  --bg-secondary: #1f2937; /* Secondary background (lighter dark gray for cards) */
+  --text-primary: #f9fafb; /* Primary text color (off-white) */
+  --text-secondary: #9ca3af; /* Secondary text color (gray for descriptions) */
+  --border-color: #374151; /* Border color for cards and dividers */
+}
+
+/* Ensure full viewport height and remove default spacing on main containers */
+html,
+body,
+#root {
+  min-height: 100vh; /* At least full viewport height */
+  margin: 0; /* Remove default margins */
+  padding: 0; /* Remove default padding */
+  background-color: #111827 !important; /* Force dark background */
+}
+
+/* Apply dark background and light text directly to body element */
+body {
+  background-color: #111827 !important; /* Dark gray background */
+  color: #f9fafb !important; /* Off-white text color */
+}
+
+/* Define CSS variables for .dark class (used when dark mode is manually toggled) */
+.dark {
+  --bg-primary: #111827; /* Same dark colors for manual dark mode */
+  --bg-secondary: #1f2937;
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+  --border-color: #374151;
+}
+
+/* Force dark mode background on all containers when .dark class is present */
+.dark body,
+.dark html,
+.dark #root {
+  background-color: #111827 !important;
+}
